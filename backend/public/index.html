@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>📡 Dashboard RFID</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin-top: 50px;
+      background: #f7f7f7;
+    }
+    h1 {
+      color: #333;
+    }
+    .card {
+      display: inline-block;
+      background: white;
+      padding: 30px;
+      border-radius: 16px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      width: 300px;
+    }
+    button {
+      background: #007bff;
+      border: none;
+      color: white;
+      padding: 10px 20px;
+      border-radius: 10px;
+      cursor: pointer;
+      margin-top: 20px;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    .uid {
+      font-size: 18px;
+      color: #444;
+      margin-top: 15px;
+    }
+  </style>
+</head>
+<body>
+  <h1>📡 Dashboard RFID</h1>
+  <div class="card">
+    <p>Mode Saat Ini:</p>
+    <h2 id="mode">...</h2>
+    <button id="toggle">🔁 Ganti Mode</button>
+    <div class="uid">
+      <p>UID Terakhir:</p>
+      <b id="uid">-</b>
+    </div>
+  </div>
+
+  <script>
+    const modeEl = document.getElementById("mode");
+    const uidEl = document.getElementById("uid");
+    const btn = document.getElementById("toggle");
+
+    async function updateStatus() {
+      const res = await fetch("/status");
+      const data = await res.json();
+      modeEl.innerText = data.mode.toUpperCase();
+      if(data.mode == "register") {
+            uidEl.innerText = data.uid + " Berhasil di Register" || "-";
+        } else {
+            uidEl.innerText = data.uid + " Berhasil di Read" || "-";
+        }
+    }
+
+    btn.onclick = async () => {
+      const newMode = modeEl.innerText.toLowerCase() === "read" ? "register" : "read";
+      await fetch(`/set-mode/${newMode}`, { method: "POST" });
+      updateStatus();
+    };
+
+    // Update setiap 2 detik
+    setInterval(updateStatus, 2000);
+    updateStatus();
+  </script>
+</body>
+</html>
