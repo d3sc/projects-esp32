@@ -3,7 +3,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import mqtt from "mqtt";
 import db from "./db.js";
-import readline from "readline";
+import bodyParser from "body-parser";
 
 // ===============================
 // KONFIGURASI
@@ -11,8 +11,12 @@ import readline from "readline";
 const MQTT_BROKER = "mqtt://192.168.1.14";
 const TOPIC_PUB = "server/esp32";
 const TOPIC_SUB = "esp32/server";
+
 let currentMode = "read";
 let lastUID = "-";
+
+// tambahkan fitur untuk langsung kosongkan lastUID setelah beberapa request atau detik
+
 
 // ===============================
 // SETUP EXPRESS
@@ -22,17 +26,59 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 app.use(express.static(path.join(__dirname, "public")));
+app.use(bodyParser.json());
 
+// Endpoint status dashboard
 app.get("/status", (req, res) => {
-  res.json({ mode: currentMode, uid: lastUID });
+  if (lastUID !== "-") {
+    db.query("SELECT * FROM absensi WHERE uid = ?", [lastUID], (err, results) => {
+      if (err) return res.json({ success: false, error: err.message });
+
+      let getTime = new Date();
+
+      if (results.length > 0) {
+        // UID sudah ada di database
+        res.json({
+          mode: currentMode,
+          uid: lastUID,
+          person: results[0], // ambil data orang
+          signIn: getTime
+        });
+      } else {
+        // UID belum ada di database
+        res.json({
+          mode: currentMode,
+          uid: lastUID,
+          person: null
+        });
+      }
+    });
+  } else {
+    // Tidak ada UID terakhir
+    res.json({ mode: currentMode, uid: lastUID, person: null });
+  }
 });
 
+// Endpoint ubah mode
 app.post("/set-mode/:mode", (req, res) => {
   const mode = req.params.mode;
   currentMode = mode;
   client.publish(TOPIC_PUB, JSON.stringify({ mode }));
   console.log(`🔁 Mode diubah ke: ${mode}`);
   res.json({ success: true, mode });
+});
+
+// Endpoint register UID + nama
+app.post("/register", (req, res) => {
+  const { uid, name } = req.body;
+  if (!uid || !name) return res.json({ success: false, error: "UID atau nama kosong" });
+
+  db.query("INSERT IGNORE INTO absensi (uid, name) VALUES (?, ?)", [uid, name], (err) => {
+    if (err) return res.json({ success: false, error: err.message });
+    lastUID = "-"; // reset UID setelah ditambahkan
+    res.json({ success: true });
+    console.log(`✅ UID ${uid} berhasil ditambahkan dengan nama ${name}`);
+  });
 });
 
 const PORT = 3000;
@@ -72,10 +118,8 @@ client.on("message", (topic, message) => {
     const mode = data.mode || currentMode;
 
     if (mode === "register") {
-      db.query("INSERT IGNORE INTO absensi (uid) VALUES (?)", [data.uid], (err) => {
-        if (err) console.error("❌ Gagal simpan UID:", err);
-        else console.log("✅ UID terdaftar:", data.uid);
-      });
+      // Jangan langsung simpan, tunggu nama dari dashboard
+      console.log(`🔁 Mode REGISTER, UID ${lastUID} menunggu input nama...`);
     } else {
       console.log("📖 UID dibaca:", data.uid);
     }

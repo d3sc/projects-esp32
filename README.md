@@ -4,6 +4,8 @@ MPRemote adalah tool dari **MicroPython** untuk mengelola ESP32. Dengan MPRemote
 
 ---
 
+disini saya menggunakan venv
+
 ## 📦 Persiapan
 
 1. Pastikan ESP32 terhubung ke komputer via USB.

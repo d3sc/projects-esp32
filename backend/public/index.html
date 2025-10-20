@@ -46,9 +46,21 @@
     <p>Mode Saat Ini:</p>
     <h2 id="mode">...</h2>
     <button id="toggle">🔁 Ganti Mode</button>
-    <div class="uid">
+
+    <div class="uid-section">
       <p>UID Terakhir:</p>
       <b id="uid">-</b>
+    </div>
+
+    <div id="register-section" style="display:none;">
+      <p>Nama Pegawai:</p>
+      <input type="text" id="name" placeholder="Masukkan nama">
+      <button id="add-btn" disabled>Tambahkan Data</button>
+    </div>
+
+    <div id="read-section" style="display:none;">
+      <p>Nama Pegawai: <span id="namaPegawai"></span></p>
+      <p>masuk jam: <span id="masukJam"></span></p>
     </div>
   </div>
 
@@ -56,25 +68,75 @@
     const modeEl = document.getElementById("mode");
     const uidEl = document.getElementById("uid");
     const btn = document.getElementById("toggle");
+    const registerSection = document.getElementById("register-section");
+    const nameInput = document.getElementById("name");
+    const addBtn = document.getElementById("add-btn");
+    const readSection = document.getElementById("read-section");
+    const namaPegawai = document.getElementById("namaPegawai");
+    const masukJam = document.getElementById("masukJam");
+
+    let lastUID = null;
+    let currentMode = "read";
 
     async function updateStatus() {
       const res = await fetch("/status");
       const data = await res.json();
-      modeEl.innerText = data.mode.toUpperCase();
-      if(data.mode == "register") {
-            uidEl.innerText = data.uid + " Berhasil di Register" || "-";
-        } else {
-            uidEl.innerText = data.uid + " Berhasil di Read" || "-";
+      currentMode = data.mode;
+      modeEl.innerText = currentMode.toUpperCase();
+
+      if (currentMode === "register") {
+        registerSection.style.display = "block";
+      } else {
+        registerSection.style.display = "none";
+        addBtn.disabled = true;
+      }
+      console.log(data);
+
+      if (data.uid && data.uid !== lastUID) {
+        lastUID = data.uid;
+        uidEl.innerText = lastUID;
+        if (currentMode === "register") {
+          addBtn.disabled = false;
         }
+
+        if(data.person) {
+          readSection.style.display = "block"
+          namaPegawai.textContent = data.person.name
+          masukJam.textContent = data.signIn
+        }
+      }
     }
 
     btn.onclick = async () => {
-      const newMode = modeEl.innerText.toLowerCase() === "read" ? "register" : "read";
+      const newMode = currentMode === "read" ? "register" : "read";
       await fetch(`/set-mode/${newMode}`, { method: "POST" });
       updateStatus();
     };
 
-    // Update setiap 2 detik
+    addBtn.onclick = async () => {
+      const name = nameInput.value.trim();
+      if (!name) {
+        alert("Nama harus diisi!");
+        return;
+      }
+
+      // Kirim UID + nama ke server
+      const res = await fetch("/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ uid: lastUID, name }),
+      });
+      const result = await res.json();
+      if (result.success) {
+        alert(`✅ UID ${lastUID} berhasil ditambahkan dengan nama ${name}`);
+        nameInput.value = "";
+        addBtn.disabled = true;
+      } else {
+        alert("❌ Gagal menambahkan data");
+      }
+    };
+
+    // Update status setiap 2 detik
     setInterval(updateStatus, 2000);
     updateStatus();
   </script>
